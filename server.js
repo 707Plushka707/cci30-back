@@ -14,6 +14,8 @@ app.use(express.json());
 app.use('/api/weight', require('./routes/weight'));
 app.use('/api/ohlcv', require('./routes/ohlcv'));
 app.use('/api/constituents', require('./routes/constituents'));
+app.use('/api/binance', require('./routes/binance'));
+app.use('/api/rebalancing', require('./routes/rebalancing'));
 
 app.get('/', (req, res) => res.json({ msg: 'Welcome to the Waitlist.....' }));
 
