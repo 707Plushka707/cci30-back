@@ -1,4 +1,4 @@
-const { getBinanceAccountInfo, buyOrdersFromBTC, sellOrdersToBTC, getAllUSDTPairs, getUsdtOrderPrice } = require('./binance')
+const { getBinanceAccountInfo, buyOrdersFromBTC, sellOrdersToBTC, getAllUSDTPairs, getUsdtOrderPrice, getBinanceWalletBTCValues, getOrderListWithoutQty, getOrderQty } = require('./binance')
 const { getCCi30Info } = require('./constituents')
 
 exports.getBTCrebalancing = async (req, res, next) => {
@@ -6,28 +6,55 @@ exports.getBTCrebalancing = async (req, res, next) => {
         // Variables
         let cci30UsdtPairs;
         let cci30UsdtOrderPrice;
+        let binanceAccount;
 
         // 1. Get all constituents info from Google Sheet
         const cci30Info = await getCCi30Info()
             .then(async (cci30details) => {
 
                 // 2. Get all cci30 USDT value
-                cci30UsdtPairs = await getAllUSDTPairs(cci30details)
+                await getAllUSDTPairs(cci30details)
                     .then(async (usdtpairs) => {
 
                         // 3. Get all cci30 USDT order price
-                        cci30UsdtOrderPrice = await getUsdtOrderPrice(usdtpairs[0])
+                        await getUsdtOrderPrice(usdtpairs[0])
                             .then(async (orderprice) => {
                                 //console.log("ODR PRICE: ", orderprice[0])
 
                                 // 4. Get client account info
-                                binanceAccount = await getBinanceAccountInfo(process.env.API_KEY, process.env.SECRET_KEY, cci30details)
-                                    .then(async (clientinfo) => {
-                                        console.log(clientinfo);
+                                await getBinanceAccountInfo(process.env.API_KEY, process.env.SECRET_KEY)
+                                    .then(async (clientwallet) => {
+                                        //console.log("WALLET CLIENT: ", clientwallet);
+
+                                        // 5. Get wallet BTC value of each coins
+                                        await getBinanceWalletBTCValues(clientwallet, usdtpairs[0])
+                                            .then(async (walletBTCweight) => {
+                                                //console.log("PERCENTAGE: ", walletBTCweight.clientWallet)
+                                                //console.log("TOTAL BTC: ", walletBTCweight.totalBTC)
+
+
+                                                // 6. Get order list
+                                                await getOrderListWithoutQty(walletBTCweight.clientWallet, cci30details, usdtpairs[0])
+                                                    .then(async (orders) => {
+                                                        //console.log("ORDER LIST: ", orders[0].orderList);
+                                                        //console.log("NOT IN CCI30: ", orders[0].notInCci30);
+
+                                                        if (orders[0].notInCci30.length == 0) {
+                                                            // Get all orders quantity
+                                                            await getOrderQty(orders[0].orderList, usdtpairs[0], walletBTCweight.totalBTC)
+                                                                .then(async (ordersWithQty) => {
+                                                                    console.log("ORDER WITH QTY: ", ordersWithQty[0]);
+
+                                                                    // Place order
+                                                                })
+                                                        } else {
+                                                            // Get historical trade of not in CCi30 asset
+
+                                                        }
+                                                    })
+                                            })
                                     })
                             });
-
-
                     });
             });
 
