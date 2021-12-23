@@ -711,7 +711,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                         // Get weight difference from what is expected by CCi30 and what is inside wallet
                         //weightDifference = Number((c.weight - w.weight_percentage).toFixed(2));
                         weightDifference = Number((((c.weight * 100) / totalPercentageLess2k) - w.weight_percentage).toFixed(2));
-                        console.log("WEIGHT CALCULE: ", weightDifference, " <2K: ", totalPercentageLess2k, " GS: ", (c.weight * 100) / totalPercentageLess2k, " WALLET: ", w.weight_percentage);
+                        //console.log("WEIGHT CALCULE: ", weightDifference, " <2K: ", totalPercentageLess2k, " GS: ", (c.weight * 100) / totalPercentageLess2k, " WALLET: ", w.weight_percentage);
 
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
@@ -798,7 +798,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                         // Get weight difference from what is expected by CCi30 and what is inside wallet
                         weightDifference = Number((((c.weight * 100) / totalPercentageLess2k) - w.weight_percentage).toFixed(2));
 
-                        console.log("WEIGHT CALCULE 2: ", weightDifference, " <2K: ", totalPercentageLess2k, " GS: ", (c.weight * 100) / totalPercentageLess2k, " WALLET: ", w.weight_percentage);
+                        //console.log("WEIGHT CALCULE 2: ", weightDifference, " <2K: ", totalPercentageLess2k, " GS: ", (c.weight * 100) / totalPercentageLess2k, " WALLET: ", w.weight_percentage);
 
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
@@ -869,6 +869,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
             })
 
         } else {
+            console.log("MORE THAN 2K");
             checkExistenceCCi30 = await cci30details.map(async (c) => {
                 let exists = 0;
                 let notExists = 0;
@@ -883,7 +884,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
 
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
-                        if (weightDifference > 0.5) {
+                        if (weightDifference > 0.51) {
                             order_type = "BUY"
 
                             await usdtpairs.map(async (u) => {
@@ -891,14 +892,14 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                     let tempObj = {
                                         asset: w.asset,
                                         order_type: order_type,
-                                        order_percentage: weightDifference,
+                                        order_percentage: (Math.floor(weightDifference * 10) / 10) - 0.1,
                                         order_price: u.order_price,
                                     }
 
                                     orderList.push(tempObj);
                                 }
                             })
-                        } else if (weightDifference < -0.5) {
+                        } else if (weightDifference < -0.51) {
                             order_type = "SELL"
 
                             await usdtpairs.map(async (u) => {
@@ -906,7 +907,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                     let tempObj = {
                                         asset: w.asset,
                                         order_type: order_type,
-                                        order_percentage: weightDifference,
+                                        order_percentage: Math.floor(weightDifference * 10) / 10,
                                         order_price: u.order_price,
                                     }
 
@@ -924,16 +925,18 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                         if (isInArray(notInCci30, c.asset) == false) {
                             //notInCci30.push(c);
 
-                            if (c.asset == u.asset) {
-                                let tempObj = {
-                                    asset: c.asset,
-                                    order_type: "BUY",
-                                    order_percentage: c.weight,
-                                    order_price: u.order_price
-                                }
+                            await usdtpairs.map(async (u) => {
+                                if (c.asset == u.asset) {
+                                    let tempObj = {
+                                        asset: c.asset,
+                                        order_type: "BUY",
+                                        order_percentage: (Math.floor(c.weight * 10) / 10) - 0.1,
+                                        order_price: u.order_price
+                                    }
 
-                                orderList.push(tempObj);
-                            }
+                                    orderList.push(tempObj);
+                                }
+                            })
                         }
                     }
                 }
@@ -955,7 +958,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
 
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
-                        if (weightDifference > 0.5) {
+                        if (weightDifference > 0.51) {
                             order_type = "BUY"
 
                             await usdtpairs.map(async (u) => {
@@ -964,7 +967,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                         let tempObj = {
                                             asset: c.asset,
                                             order_type: order_type,
-                                            order_percentage: weightDifference,
+                                            order_percentage: (Math.floor(weightDifference * 10) / 10) - 0.1,
                                             order_price: u.order_price,
                                         }
 
@@ -973,7 +976,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                 }
 
                             })
-                        } else if (weightDifference < -0.5) {
+                        } else if (weightDifference < -0.51) {
                             order_type = "SELL"
 
                             await usdtpairs.map(async (u) => {
@@ -982,7 +985,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                         let tempObj = {
                                             asset: c.asset,
                                             order_type: order_type,
-                                            order_percentage: weightDifference,
+                                            order_percentage: Math.floor(weightDifference * 10) / 10,
                                             order_price: u.order_price,
                                         }
 
@@ -1001,11 +1004,11 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                     if (w.asset != "USDT") {
                         if (isInArray(orderList, w.asset) == false) {
                             await usdtpairs.map(async (u) => {
-                                if (w.asset == u.asset) {
+                                if (w.asset == u.asset && w.weight_percentage < -0.51) {
                                     let tempObj = {
                                         asset: w.asset,
                                         order_type: "SELL",
-                                        order_percentage: w.weight_percentage,
+                                        order_percentage: Math.floor(w.weight_percentage * 10) / 10,
                                         order_price: u.order_price
                                     }
 
@@ -1049,8 +1052,8 @@ exports.getOrderQty = async (orderlist, usdtpairs, totalbtc) => {
             await usdtpairs.map(async (u) => {
                 if (o.asset == u.asset) {
 
-                    // Only execute order if order percentage is >0.5, otherwise fees will not be worth it
-                    if (Math.abs(o.order_percentage) > 0.5) {
+                    // Only execute order if order percentage is >0.51, otherwise fees will not be worth it
+                    if (Math.abs(o.order_percentage) > 0.51) {
 
                         // Get number of decimal for each qty based on step_size
                         let stepSizeDecimal = countDecimals(u.step_size);
@@ -1190,7 +1193,7 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
                     timeInForce: 'GTC',
                 }).then(response => client.logger.log("AFTER BUY LIMIT ORDER: ", response.data))
                     .catch(error => {
-                        client.logger.error(error)
+                        client.logger.error("BROOO: ", error.response.data.msg)
                     })
             }
             // Else use remaining USDT for the order
@@ -1218,7 +1221,7 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
                         timeInForce: 'GTC',
                     }).then(response => client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data))
                         .catch(error => {
-                            client.logger.error(error)
+                            client.logger.error("GADDAM: ", error.response.data.msg)
                         })
                 } else {
                     await client.newOrder(`${bl.asset}USDT`, 'BUY', 'LIMIT', {
@@ -1227,7 +1230,7 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
                         timeInForce: 'GTC',
                     }).then(response => client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data))
                         .catch(error => {
-                            client.logger.error(error)
+                            client.logger.error("pfff: ", error.response.data.msg)
                         })
                 }
             }
@@ -1260,12 +1263,11 @@ exports.getOpenOrdersList = async () => {
                     }).then(async (res) => {
                         client.logger.log("CANCELED: ", res.data)
 
-                        await client.newOrder(`${res.data.symbol}`, 'BUY', 'MARKET', {
-                            quantity: res.data.origQty,
+                        await client.newOrder(`${res.data[0].symbol}`, 'BUY', 'MARKET', {
+                            quantity: res.data[0].origQty,
                         }).then(resp => client.logger.log("AFTER BUY MRAKET HERE: ", resp.data))
                             .catch(error => {
-                                client.logger.error("Error buy market catch here: ", error)
-                                buyMarketErrorArray.push(bm);
+                                client.logger.error("Error buy market catch here: ", error.response.data.msg)
                             })
 
                     })
