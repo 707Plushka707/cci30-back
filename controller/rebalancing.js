@@ -7,6 +7,8 @@ const {
     getOrderQty,
     placeSellMarketOrders,
     placeBuyLimitOrders,
+    getOpenOrdersList,
+    placeBuyMarketOrders,
 } = require('./binance');
 const { getCCi30Info } = require('./constituents');
 
@@ -235,69 +237,94 @@ exports.getBTCrebalancing = async (req, res, next) => {
                                                 // 6. Get order list
                                                 await getOrderListWithoutQty(walletBTCweight.clientWallet, walletBTCweight.totalUSDT, cci30details, usdtpairs[0])
                                                     .then(async (orders) => {
-                                                        //console.log("ORDER LIST: ", orders.orderList);
+                                                        console.log("ORDER LIST: ", orders.orderList);
                                                         //console.log("NOT IN CCI30: ", orders.notInCci30);
+
+                                                        // Variables
+                                                        let canceledOrdersArray;
 
                                                         // 7. Get all orders quantity
                                                         // await getOrderQty(orders.orderList, usdtpairs[0], walletBTCweight.totalBTC)
-                                                        await getOrderQty(orders.orderList, usdtpairs[0], walletBTCweight.totalBTC)
-                                                            .then(async (ordersWithQty) => {
-                                                                console.log("ORDER WITH QTY: ", ordersWithQty[0]);
-
-                                                                // Place all sell market order first
-                                                                let sellOrders = [];
-                                                                let buyOrders = [];
-
-                                                                const waitForSellOrdersArray = await ordersWithQty[0].map(async (o) => {
-                                                                    if (o.order_type == "SELL") {
-                                                                        //console.log("OOOO: ", o)
-                                                                        if (isInArray(sellOrders, o.asset) == false) {
-                                                                            sellOrders.push(o);
-                                                                        }
-
-                                                                    } else {
-                                                                        if (isInArray(buyOrders, o.asset) == false) {
-                                                                            buyOrders.push(o);
-                                                                        }
-                                                                    }
-                                                                })
-
-                                                                //console.log("ALL SELL: ", sellOrders);
-                                                                //console.log("ALL BUY: ", buyOrders);
-
-                                                                if (sellOrders.length > 0) {
-                                                                    await placeSellMarketOrders(sellOrders)
-                                                                        .then(async (sellMarketOrdersDone) => {
-                                                                            console.log("SELL MARKET ORDERS DONE:")
-
-                                                                            //this.afterSellMarketBatch();
-                                                                            //await placeBuyLimitOrders(buyOrders)
-                                                                            //  .then(async (buyLimitOrdersDone) => {
-                                                                            //    console.log("BUY LIMIT ORDERS DONE:")
-                                                                            //})
-                                                                        })
-                                                                } else {
-                                                                    await placeBuyLimitOrders(buyOrders)
-                                                                        .then(async (buyLimitOrdersDone) => {
-                                                                            console.log("BUY LIMIT ORDERS DONE:")
-                                                                        })
-                                                                }
-
-                                                                // Place all buy limit order
-                                                            })
-
-                                                        /*if (orders[0].notInCci30.length == 0) {
-                                                            // Get all orders quantity
-                                                            await getOrderQty(orders[0].orderList, usdtpairs[0], walletBTCweight.totalBTC)
+                                                        if (orders.orderList.length > 0) {
+                                                            await getOrderQty(orders.orderList, usdtpairs[0], walletBTCweight.totalBTC)
                                                                 .then(async (ordersWithQty) => {
                                                                     console.log("ORDER WITH QTY: ", ordersWithQty[0]);
 
-                                                                    // Place order
-                                                                })
-                                                        } else {
-                                                            // Get historical trade of not in CCi30 asset
+                                                                    // Place all sell market order first
+                                                                    let sellOrders = [];
+                                                                    let buyOrders = [];
 
-                                                        }*/
+                                                                    const waitForSellOrdersArray = await ordersWithQty[0].map(async (o) => {
+                                                                        if (o.order_type == "SELL") {
+                                                                            //console.log("OOOO: ", o)
+                                                                            if (isInArray(sellOrders, o.asset) == false) {
+                                                                                sellOrders.push(o);
+                                                                            }
+
+                                                                        } else {
+                                                                            if (isInArray(buyOrders, o.asset) == false) {
+                                                                                buyOrders.push(o);
+                                                                            }
+                                                                        }
+                                                                    })
+
+                                                                    //console.log("ALL SELL: ", sellOrders);
+                                                                    //console.log("ALL BUY: ", buyOrders);
+
+                                                                    if (sellOrders.length > 0) {
+                                                                        await placeSellMarketOrders(sellOrders)
+                                                                            .then(async (sellMarketOrdersDone) => {
+                                                                                console.log("SELL MARKET ORDERS DONE:")
+                                                                            })
+                                                                    }
+                                                                    /*else {
+                                                                        await placeBuyLimitOrders(buyOrders)
+                                                                            .then(async (buyLimitOrdersDone) => {
+                                                                                console.log("BUY LIMIT ORDERS DONE:")
+                                                                            })
+                                                                    }*/
+
+                                                                    // Place all buy limit order after 3min so that we are sure that 
+                                                                    // are executed all sell markets
+                                                                    setTimeout(async () => {
+                                                                        await placeBuyLimitOrders(buyOrders)
+                                                                            .then(async (buyLimitOrdersDone) => {
+                                                                                console.log("BUY LIMIT ORDERS DONE: ", buyLimitOrdersDone)
+                                                                            })
+                                                                    }, 1 * 60 * 1000);
+                                                                })
+
+                                                            // Check for limit orders that have not been executed yet
+                                                            // Cancel them and go for market orders
+                                                            setTimeout(async () => {
+                                                                await getOpenOrdersList()
+                                                                    .then(async (canceledOrders) => {
+                                                                        console.log("Canceled Orders: ", canceledOrders)
+                                                                        canceledOrdersArray = canceledOrders;
+                                                                    })
+                                                            }, 2 * 60 * 1000);
+
+                                                            // Place all buy market orders for orders that have been canceled
+                                                            /*setTimeout(async () => {
+                                                                // Variables
+                                                                let buyMarketArray = [];
+
+                                                                await canceledOrdersArray.map(async (co) => {
+                                                                    await buyOrders.map(async (bo) => {
+                                                                        if (co.symbol == `${bo.asset}USDT`) {
+                                                                            buyMarketArray.push(bo);
+                                                                        }
+                                                                    })
+                                                                })
+
+                                                                if (buyMarketArray.length > 0) {
+                                                                    await placeBuyMarketOrders(buyMarketArray)
+                                                                        .then(async (buyMarketOrders) => {
+                                                                            console.log("after buy market Orders: ", buyMarketOrders)
+                                                                        })
+                                                                }
+                                                            }, 3 * 60 * 1000);*/
+                                                        }
                                                     })
                                             })
                                     })

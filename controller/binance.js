@@ -33,7 +33,7 @@ exports.getAllUSDTPairs2 = async (cci30Info) => {
         let minNotional;
 
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.secretKey_KEY);
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
 
         const cci30Mapping = await cci30Info.map(async (c) => {
             // Get exchange info to get all pairs
@@ -96,7 +96,7 @@ exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
         let combinedArray = [...clientwallet, ...cci30Info];
 
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.secretKey_KEY);
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
 
         const cci30Mapping = await combinedArray.map(async (c) => {
             //console.log("ASSET: ", c.asset, " EXISTS ? ", isInArray(usdtPairsAssets, c.asset), " ARRAY: ", usdtPairsAssets);
@@ -164,7 +164,7 @@ exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
 
 // Get all USDT order price
 exports.getUsdtOrderPrice = async (asset) => {
-    const client = new Spot(process.env.API_KEY, process.env.secretKey_KEY);
+    const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
 
     // Variables
     let order_price;
@@ -695,6 +695,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
 
         if (walletUSDTtotal < 2010) {
             await sortedArray.map(async (s) => {
+                //console.log("ASSET: ", s.asset, " WEIGHT: ", s.weight);
                 return totalPercentageLess2k = totalPercentageLess2k + s.weight;
             })
 
@@ -710,20 +711,21 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                         // Get weight difference from what is expected by CCi30 and what is inside wallet
                         //weightDifference = Number((c.weight - w.weight_percentage).toFixed(2));
                         weightDifference = Number((((c.weight * 100) / totalPercentageLess2k) - w.weight_percentage).toFixed(2));
+                        console.log("WEIGHT CALCULE: ", weightDifference, " <2K: ", totalPercentageLess2k, " GS: ", (c.weight * 100) / totalPercentageLess2k, " WALLET: ", w.weight_percentage);
 
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
                         if (weightDifference > 3.5) {
                             order_type = "BUY";
 
-                            console.log("TETS: ", Math.floor(weightDifference * 10) / 10)
+                            //console.log("TETS: ", Math.floor(weightDifference * 10) / 10)
 
                             await usdtpairs.map(async (u) => {
                                 if (w.asset == u.asset) {
                                     let tempObj = {
                                         asset: w.asset,
                                         order_type: order_type,
-                                        order_percentage: Math.floor(weightDifference * 10) / 10,
+                                        order_percentage: (Math.floor(weightDifference * 10) / 10) - 0.1,
                                         order_price: u.order_price,
                                     }
 
@@ -764,12 +766,12 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                         order_price: u.order_price
                                     }*/
 
-                                    console.log("TETS 2: ", Math.floor((Number(((c.weight * 100) / totalPercentageLess2k))) * 10) / 10)
+                                    //console.log("TETS 2: ", Math.floor((Number(((c.weight * 100) / totalPercentageLess2k))) * 10) / 10)
 
                                     let tempObj = {
                                         asset: c.asset,
                                         order_type: "BUY",
-                                        order_percentage: Math.floor((Number(((c.weight * 100) / totalPercentageLess2k))) * 10) / 10,
+                                        order_percentage: (Math.floor((Number(((c.weight * 100) / totalPercentageLess2k))) * 10) / 10) - 0.1,
                                         order_price: u.order_price
                                     }
 
@@ -796,6 +798,8 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                         // Get weight difference from what is expected by CCi30 and what is inside wallet
                         weightDifference = Number((((c.weight * 100) / totalPercentageLess2k) - w.weight_percentage).toFixed(2));
 
+                        console.log("WEIGHT CALCULE 2: ", weightDifference, " <2K: ", totalPercentageLess2k, " GS: ", (c.weight * 100) / totalPercentageLess2k, " WALLET: ", w.weight_percentage);
+
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
                         if (weightDifference > 3.5) {
@@ -804,12 +808,12 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                             await usdtpairs.map(async (u) => {
                                 if (c.asset == u.asset) {
                                     if (isInArray(orderList, w.asset) == false) {
-                                        console.log("TETS 3: ", Math.floor(weightDifference * 10) / 10)
+                                        //console.log("TETS 3: ", Math.floor(weightDifference * 10) / 10)
 
                                         let tempObj = {
                                             asset: c.asset,
                                             order_type: order_type,
-                                            order_percentage: Math.floor(weightDifference * 10) / 10,
+                                            order_percentage: (Math.floor(weightDifference * 10) / 10) - 0.1,
                                             order_price: u.order_price,
                                         }
 
@@ -1025,7 +1029,6 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
     }
 }
 
-
 // Get quantity for each order
 exports.getOrderQty = async (orderlist, usdtpairs, totalbtc) => {
     try {
@@ -1116,7 +1119,7 @@ exports.placeSellMarketOrders = async (sellMarketOrders) => {
                 quantity: sm.qty,
             }).then(response => client.logger.log("AFTER SELL MRAKET: ", response.data))
                 .catch(error =>
-                    client.logger.error(error)
+                    client.logger.error("Error sell market catch: ", error)
                 )
         })
 
@@ -1127,6 +1130,32 @@ exports.placeSellMarketOrders = async (sellMarketOrders) => {
 
 }
 
+// Place BUY MARKET orders
+exports.placeBuyMarketOrders = async (buyMarketOrders) => {
+    try {
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+
+        // Variables
+        let buyMarketErrorArray = [];
+
+        await buyMarketOrders.map(async (bm) => {
+            //console.log("BUY MARKET: ", finalQty)
+            await client.newOrder(`${bm.asset}USDT`, 'BUY', 'MARKET', {
+                quantity: bm.qty,
+            }).then(response => client.logger.log("AFTER BUY MRAKET: ", response.data))
+                .catch(error => {
+                    client.logger.error("Error buy market catch: ", error)
+                    buyMarketErrorArray.push(bm);
+                })
+        })
+
+        return buyMarketErrorArray;
+    } catch (error) {
+        console.log("ERROR IN BUY MARKET ORDER: ", error)
+    }
+}
+
 // Place all BUY LIMIT orders
 exports.placeBuyLimitOrders = async (buyLimitOrders) => {
     try {
@@ -1134,15 +1163,74 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
         const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
 
         await buyLimitOrders.map(async (bl) => {
-            //console.log("BUY: ", bl)
-            await client.newOrder(`${bl.asset}USDT`, 'BUY', 'LIMIT', {
-                price: `${bl.order_price}`,
-                quantity: bl.qty,
-                timeInForce: 'GTC',
-            }).then(response => client.logger.log("AFTER BUY LIMIT ORDER: ", response.data))
-                .catch(error =>
-                    client.logger.error(error)
-                )
+            // Variables
+            let usdtFreeValue = 0;
+            let qtyXprice = 0;
+
+            // Check if USDT is >= to the qty to buy to avoid having "Insufficient balance" error
+            await client.account()
+                .then(async (res) => {
+                    await res.data.balances.map(b => {
+                        if (b.asset == "USDT") {
+                            usdtFreeValue = parseFloat(Number(b.free));
+                        }
+                    })
+                })
+
+            // Compare usdtFreeValue with qty*price of buy order
+            qtyXprice = bl.order_price * bl.qty;
+            console.log("QTYxPRICE: ", qtyXprice, " FREE: ", usdtFreeValue);
+
+            // If free USDT is >= to what qty is required, proceed with tje buy limit
+            if (usdtFreeValue > qtyXprice && usdtFreeValue > 10.1) {
+                //console.log("BUY: ", finalQty)
+                await client.newOrder(`${bl.asset}USDT`, 'BUY', 'LIMIT', {
+                    price: `${bl.order_price}`,
+                    quantity: bl.qty,
+                    timeInForce: 'GTC',
+                }).then(response => client.logger.log("AFTER BUY LIMIT ORDER: ", response.data))
+                    .catch(error => {
+                        client.logger.error(error)
+                    })
+            }
+            // Else use remaining USDT for the order
+            else {
+                let decimalCount = countDecimals(bl.qty)
+                let finalQty = Number((usdtFreeValue / bl.order_price).toFixed(decimalCount));
+                console.log("FINAL: ", finalQty);
+
+                // If qty is till the same as the previous, substract
+                if (finalQty >= bl.qty) {
+                    let divider = '1';
+                    for (let i = 0; i < decimalCount; i++) {
+                        divider = divider + '0'
+                    }
+
+                    console.log("FINAL MULTIPLAIER: ", 1 / Number((Number(divider)).toFixed(decimalCount)))
+
+                    finalQty = finalQty - (1 / Number((Number(divider)).toFixed(decimalCount)));
+
+                    console.log("FINAL AGAIN: ", finalQty)
+
+                    await client.newOrder(`${bl.asset}USDT`, 'BUY', 'LIMIT', {
+                        price: `${bl.order_price}`,
+                        quantity: Number(finalQty.toFixed(decimalCount)),
+                        timeInForce: 'GTC',
+                    }).then(response => client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data))
+                        .catch(error => {
+                            client.logger.error(error)
+                        })
+                } else {
+                    await client.newOrder(`${bl.asset}USDT`, 'BUY', 'LIMIT', {
+                        price: `${bl.order_price}`,
+                        quantity: finalQty,
+                        timeInForce: 'GTC',
+                    }).then(response => client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data))
+                        .catch(error => {
+                            client.logger.error(error)
+                        })
+                }
+            }
         })
 
         return;
@@ -1151,6 +1239,45 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
     }
 }
 
+// Get open orders
+exports.getOpenOrdersList = async () => {
+    try {
+        // Variables
+        let canceledOrderArray = [];
+
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+
+        // Get list of all open orders
+        await client.openOrders()
+            .then(async (response) => {
+                //console.log("OPEN ORDER: ", response.data);
+
+                await response.data.map(async (oo) => {
+                    // Cancel all open orders
+                    client.cancelOpenOrders(`${oo.symbol}`, {
+                        recvWindow: 3000
+                    }).then(async (res) => {
+                        client.logger.log("CANCELED: ", res.data)
+
+                        await client.newOrder(`${res.data.symbol}`, 'BUY', 'MARKET', {
+                            quantity: res.data.origQty,
+                        }).then(resp => client.logger.log("AFTER BUY MRAKET HERE: ", resp.data))
+                            .catch(error => {
+                                client.logger.error("Error buy market catch here: ", error)
+                                buyMarketErrorArray.push(bm);
+                            })
+
+                    })
+                        .catch(error => client.logger.error("Error get open order list catch: ", error))
+                })
+            })
+        return;
+
+    } catch (error) {
+        console.log("ERROR IN GET OPEN ORDER LIST: ", error)
+    }
+}
 
 // Deposit history
 exports.depositInfo = async () => {
