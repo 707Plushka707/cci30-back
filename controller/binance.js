@@ -25,6 +25,7 @@ const isInArray = (arrayToCkeck, assetToCheck) => {
 
 // Get all USDT pairs from cci30 constituents
 exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
+    console.log("IN HERE: ");
     try {
         // Variables
         let usdtPairsAssets = [];
@@ -93,11 +94,8 @@ exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
 
         // Get all historical value to get the order price
         const numFruits = await Promise.all(cci30Mapping)
-        //console.log("FRUIT: ", numFruits);
+        //console.log("FRUIT: ", numFruits[0]);
         return numFruits
-
-
-
     } catch (error) {
         console.log("ALL USDT PAIRS CLIENT ERROR: ", error)
     }
@@ -189,6 +187,8 @@ exports.getBinanceAccountInfo = async (apiKey, secretKey) => {
 
 // Get Binance wallet BTC value
 exports.getBinanceWalletBTCValues = async (clientwallet, usdtpairs) => {
+    console.log("BTC VALUE FUNCTION: ", clientwallet)
+
     // Variables
     let totalBTC = 0;
     let totalUSDT = 0;
@@ -599,22 +599,29 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                 })
 
                 if (notExistsWallet == cci30details.length) {
+                    console.log(w.asset, " NOT IN CCI30");
                     if (w.asset != "USDT") {
                         if (isInArray(orderList, w.asset) == false) {
                             await usdtpairs.map(async (u) => {
-                                if (w.asset == u.asset && w.weight_percentage < -0.51) {
+                                //console.log("UPAIR: ", u.asset, " WPAIR: ", w.asset, " WWEIGHT: ", w.weight_percentage);
+                                if (w.asset == u.asset && w.weight_percentage > 0.51) {
+                                    console.log(w.asset, " MAKE SELL ORDER: ", w.weight_percentage);
+
+                                    notInCci30.push(w.asset);
+
                                     let tempObj = {
                                         asset: w.asset,
                                         order_type: "SELL",
-                                        order_percentage: Math.floor(w.weight_percentage * 10) / 10,
+                                        order_percentage: -Math.abs(Math.floor(w.weight_percentage * 10) / 10),
                                         order_price: u.order_price
                                     }
-
                                     orderList.push(tempObj);
                                 }
                             })
                         }
                     }
+
+                    console.log("O LIST: ", orderList);
                 }
 
                 return { orderList, notInCci30 }
@@ -879,20 +886,57 @@ exports.getOpenOrdersList = async () => {
     }
 }
 
-// Convert remaining asset to BNB
-exports.convertToBnb = async () => {
-    console.log("IN CONVERTTOBNB FUNCTION");
+// Get list of asset to convert into BNB
+exports.convertToBnbArray = async (convertArray, assets) => {
+    try {
+        // Variables
+        let toConvert = [];
+
+        // Compare asset in wallet with CCi30 consitutuents
+        // If not in CCi30, convert to BNB
+        await assets.map(async (as) => {
+            let inCci30 = 0;
+            let notInCci30 = 0;
+
+            await convertArray.map(async (c) => {
+                //console.log("C: ", c.asset, "AS: ", as.asset);
+                if (c.asset == as.asset) {
+                    inCci30++;
+                } else {
+                    notInCci30++;
+                }
+            })
+
+            if (notInCci30 == convertArray.length) {
+                //console.log("PUSH: ", as.asset);
+                toConvert.push(as.asset);
+            }
+        })
+
+        console.log("TO CONVERT: ", toConvert)
+        return toConvert;
+
+
+    } catch (error) {
+        console.log("ERROR IN CONVERT TO BNB ARRAY: ", error)
+    }
+}
+
+exports.convertToBnb = async (arr) => {
+    console.log("ARR: ", arr);
 
     try {
         // Connect to Binance account
         const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
 
-        client.dustTransfer(['USDT'])
+        await client.dustTransfer(arr)
             .then(response => client.logger.log("CONVERT TO BNB DUST DONE: ", response.data))
             .catch(error => client.logger.error("bnb dust: ", error.response.data.msg))
+
     } catch (error) {
-        console.log("ERROR IN CONVERT TO BNB DUST: ", error)
+        console.log("ERROR IN CONVERT TO BNB FUNCTION: ", error)
     }
+
 }
 
 // Deposit history
