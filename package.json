@@ -15,7 +15,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@binance/connector": "^1.5.0",
+    "@binance/connector": "^1.6.0",
     "@sendgrid/mail": "^7.4.4",
     "axios": "^0.24.0",
     "bcryptjs": "^2.4.3",

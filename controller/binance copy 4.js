@@ -24,6 +24,65 @@ const isInArray = (arrayToCkeck, assetToCheck) => {
 }
 
 // Get all USDT pairs from cci30 constituents
+exports.getAllUSDTPairs2 = async (cci30Info) => {
+    try {
+        // Variables
+        let usdtPairsAssets = [];
+        let stepSize;
+        let minQty;
+        let minNotional;
+
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+
+        const cci30Mapping = await cci30Info.map(async (c) => {
+            // Get exchange info to get all pairs
+            await client.exchangeInfo({ symbol: `${c.asset}usdt` })
+                .then(async (response) => {
+                    //client.logger.log(response.data.symbols);
+                    response.data.symbols[0].filters.map(async (a) => {
+                        //console.log("A: ", a)
+                        // Get minimum lot size value
+                        if (a.filterType == "LOT_SIZE") {
+                            // client.logger.log(`LOT ${a.asset}: ${a.stepSize}`);
+                            stepSize = Number(a.stepSize);
+                            minQty = Number(a.minQty);
+                        }
+
+                        // Get minimum notional value
+                        if (a.filterType == "MIN_NOTIONAL") {
+                            //client.logger.log(`MIN ${a.asset}: ${a.minNotional}`);
+                            minNotional = Number(a.minNotional);
+                        }
+                    })
+
+                    // Update assets allOrderPrice array
+                    let tempObj = {
+                        asset: c.asset,
+                        step_size: stepSize,
+                        order_price: 0,
+                        min_qty: minQty,
+                        min_notional: minNotional,
+                    }
+
+                    usdtPairsAssets.push(tempObj);
+                })
+
+            //console.log("BRO: ", usdtPairsAssets);
+            return usdtPairsAssets;
+        })
+
+        // Get all historical value to get the order price
+        const numFruits = await Promise.all(cci30Mapping)
+        return numFruits
+        //console.log("FRUIT: ", numFruits);
+
+
+    } catch (error) {
+        console.log("ALL USDT PAIRS CLIENT ERROR: ", error)
+    }
+}
+
 exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
     try {
         // Variables
@@ -188,6 +247,81 @@ exports.getBinanceAccountInfo = async (apiKey, secretKey) => {
 }
 
 // Get Binance wallet BTC value
+exports.getBinanceWalletBTCValues2 = async (clientwallet, usdtpairs) => {
+    // Variables
+    let totalBTC = 0;
+
+    // Get all assets BTC value
+    const btcValues = await clientwallet.map(async (w) => {
+        if (w.asset == "BTC") {
+            await usdtpairs.map(async (u) => {
+                if (u.asset == "BTC") {
+                    w.order_price = u.order_price;
+                }
+            })
+
+            w.btc_value = w.qty;
+            totalBTC = totalBTC + w.qty;
+        } else if (w.asset == "USDT") {
+            await usdtpairs.map(async (u) => {
+
+                if (u.asset == "BTC") {
+                    let decimalNumber = ((u.step_size).toString().length) - 2;
+
+                    if (decimalNumber < 0) {
+                        decimalNumber = 0;
+                    }
+
+                    w.btc_value = parseFloat((w.qty / u.order_price).toFixed(decimalNumber));
+                    w.order_price = u.order_price;
+                    totalBTC = totalBTC + (w.qty / u.order_price);
+                }
+            })
+        } else if (w.asset != "USDT" && w.asset != "BTC") {
+            await usdtpairs.map(async (u) => {
+                if (w.asset == u.asset) {
+                    w.order_price = u.order_price;
+
+                    // 1. Get USDT value of the coin
+                    let coinUSDTvalue = Number(w.qty) * Number(u.order_price);
+
+                    // 2. Get BTC value of the coin
+                    await usdtpairs.map(async (u2) => {
+                        let decimalNumber = Number(((u2.step_size).toString().length) - 2);
+
+                        if (decimalNumber < 0) {
+                            decimalNumber = 0;
+                        }
+
+                        if (u2.asset == "BTC") {
+                            w.btc_value = parseFloat((coinUSDTvalue / Number(u2.order_price)).toFixed(decimalNumber));
+                            totalBTC = totalBTC + (coinUSDTvalue / Number(u2.order_price));
+                        }
+                    })
+                }
+            })
+        }
+    })
+
+    // Get BTC percentage of each coins in wallet
+    const btcPercentage = await Promise.all(btcValues).then(async () => {
+        // Get weight percentage of each asset
+        await clientwallet.map(async (w) => {
+            let weight;
+
+            weight = (w.btc_value * 100) / totalBTC;
+            w.weight_percentage = Number(weight.toFixed(2));
+
+            //console.log("BTC ASST: ", w.btc_value, " TOTAL: ", totalBTC, " CALCUL WEIGHT: ", w.weight_percentage)
+        })
+
+        return clientwallet;
+    });
+
+    const numFruits = await Promise.all(btcPercentage);
+    return { clientWallet: numFruits, totalBTC };
+}
+
 exports.getBinanceWalletBTCValues = async (clientwallet, usdtpairs) => {
     // Variables
     let totalBTC = 0;
@@ -272,6 +406,274 @@ exports.getBinanceWalletBTCValues = async (clientwallet, usdtpairs) => {
 }
 
 // Get order (BUY or SELL) list
+exports.getOrderListWithoutQty2 = async (walletBTCweight, cci30details, usdtpairs) => {
+    // Variables
+    let notInCci30 = [];
+    let orderList = [];
+    let weightDifference = 0;
+    let order_type;
+
+    try {
+        const checkExistence = await cci30details.map(async (c) => {
+            let exists = 0;
+            let notExists = 0;
+
+            await walletBTCweight.map(async (w) => {
+                // Check is CCi30 asset is in wallet
+                if (w.asset == c.asset) {
+                    exists++;
+
+                    // Get weight difference from what is expected by CCi30 and what is inside wallet
+                    weightDifference = Number((c.weight - w.weight_percentage).toFixed(2));
+
+                    // If difference > 0 ==> we shall buy the the asset with weight differenceCB
+                    // Else we shall sell the excess
+                    if (weightDifference > 0) {
+                        order_type = "BUY"
+                    } else {
+                        order_type = "SELL"
+                    }
+
+                    await usdtpairs.map(async (u) => {
+                        if (w.asset == u.asset) {
+                            let tempObj = {
+                                asset: w.asset,
+                                order_type: order_type,
+                                order_percentage: weightDifference,
+                                order_price: u.order_price,
+                            }
+
+                            orderList.push(tempObj);
+                        }
+                    })
+                } else {
+                    notExists++;
+                }
+            })
+
+            if (notExists == walletBTCweight.length) {
+                if (c.asset != "USDT") {
+                    if (isInArray(notInCci30, c.asset) == false) {
+                        notInCci30.push(c);
+                    }
+                } else {
+                    await usdtpairs.map(async (u) => {
+                        if (c.asset == u.asset) {
+                            let tempObj = {
+                                asset: c.asset,
+                                order_type: "BUY",
+                                order_percentage: c.weight,
+                                order_price: u.order_price
+                            }
+
+                            orderList.push(tempObj);
+                        }
+                    })
+                }
+            }
+
+            return { orderList, notInCci30 }
+        })
+
+        const numFruits = await Promise.all(checkExistence);
+        console.log("PFFFF: ", orderList)
+        return numFruits;
+
+    } catch (error) {
+        console.log("ERROR IN GET ORDER LIST FUNCRION: ", error);
+    }
+}
+
+exports.getOrderListWithoutQty3 = async (walletBTCweight, cci30details, usdtpairs) => {
+    // Variables
+    let notInCci30 = [];
+    let orderList = [];
+    let weightDifference = 0;
+    let order_type;
+
+    try {
+        const checkExistence = await walletBTCweight.map(async (w) => {
+            let exists = 0;
+            let notExists = 0;
+
+            await cci30details.map(async (c) => {
+                // Check is CCi30 asset is in wallet
+                if (w.asset == c.asset) {
+                    exists++;
+
+                    // Get weight difference from what is expected by CCi30 and what is inside wallet
+                    weightDifference = Number((c.weight - w.weight_percentage).toFixed(2));
+                    //console.log("ASSET: ", c.asset, " GS: ", c.weight, " WALLET: ", w.weight_percentage, " DIFF: ", weightDifference)
+
+                    // If difference > 0 ==> we shall buy the the asset with weight differenceCB
+                    // Else we shall sell the excess
+                    if (weightDifference > 0) {
+                        order_type = "BUY"
+                    } else {
+                        order_type = "SELL"
+                    }
+
+                    await usdtpairs.map(async (u) => {
+                        if (w.asset == u.asset) {
+                            let tempObj = {
+                                asset: w.asset,
+                                order_type: order_type,
+                                order_percentage: weightDifference,
+                                order_price: u.order_price,
+                            }
+
+                            orderList.push(tempObj);
+                        }
+                    })
+                }
+                /* else {
+                    notExists++;
+
+                    
+                }*/
+            })
+
+            return { orderList, notInCci30 }
+        })
+
+        const checkAllWalletCoins = await Promise.all(checkExistence)
+            .then(async () => {
+                await walletBTCweight.map(async (w) => {
+                    if (w.asset != "USDT" && isInArray(orderList, w.asset) == false) {
+                        let tempObj = {
+                            asset: w.asset,
+                            order_type: "SELL",
+                            order_percentage: w.weight_percentage,
+                            order_price: 0
+                        }
+
+                        orderList.push(tempObj);
+                    }
+                })
+
+                return { orderList, notInCci30 }
+            })
+
+        await usdtpairs.map(async (u) => {
+            if (u.asset != "USDT" && isInArray(orderList, u.asset) == false) {
+                let tempObj = {
+                    asset: u.asset,
+                    order_type: "BUY",
+                    order_percentage: u.weight,
+                    order_price: u.order_price
+                }
+
+                orderList.push(tempObj);
+            }
+        })
+
+        /*const cci30OrdeList = await Promise.all(checkExistence)
+            .then(async () => {
+                await cci30details.map(async (c) => {
+                    if (c.asset != "USDT" && !isInArray(notInCci30, c.asset)) {
+                        await usdtpairs.map(async (u) => {
+                            if (c.asset == u.asset) {
+                                let tempObj = {
+                                    asset: c.asset,
+                                    order_type: "BUY",
+                                    order_percentage: c.weight,
+                                    order_price: u.order_price
+                                }
+
+                                orderList.push(tempObj);
+                            }
+                        })
+                    }
+                })
+
+                return { orderList, notInCci30 }
+            })*/
+
+        return { orderList, notInCci30 }
+
+    } catch (error) {
+        console.log("ERROR IN GET ORDER LIST FUNCRION: ", error);
+    }
+}
+
+exports.getOrderListWithoutQty4 = async (walletBTCweight, cci30details, usdtpairs) => {
+    // Variables
+    let notInCci30 = [];
+    let orderList = [];
+    let weightDifference = 0;
+    let order_type;
+
+    try {
+        const checkExistence = await cci30details.map(async (c) => {
+            let exists = 0;
+            let notExists = 0;
+
+            await walletBTCweight.map(async (w) => {
+                // Check is CCi30 asset is in wallet
+                if (w.asset == c.asset) {
+                    exists++;
+
+                    // Get weight difference from what is expected by CCi30 and what is inside wallet
+                    weightDifference = Number((c.weight - w.weight_percentage).toFixed(2));
+
+                    // If difference > 0 ==> we shall buy the the asset with weight differenceCB
+                    // Else we shall sell the excess
+                    if (weightDifference > 0) {
+                        order_type = "BUY"
+                    } else {
+                        order_type = "SELL"
+                    }
+
+                    await usdtpairs.map(async (u) => {
+                        if (w.asset == u.asset) {
+                            let tempObj = {
+                                asset: w.asset,
+                                order_type: order_type,
+                                order_percentage: weightDifference,
+                                order_price: u.order_price,
+                            }
+
+                            orderList.push(tempObj);
+                        }
+                    })
+                } else {
+                    notExists++;
+                }
+            })
+
+            if (notExists == walletBTCweight.length) {
+                if (c.asset != "USDT") {
+                    if (isInArray(notInCci30, c.asset) == false) {
+                        notInCci30.push(c);
+                    }
+                } else {
+                    await usdtpairs.map(async (u) => {
+                        if (c.asset == u.asset) {
+                            let tempObj = {
+                                asset: c.asset,
+                                order_type: "BUY",
+                                order_percentage: c.weight,
+                                order_price: u.order_price
+                            }
+
+                            orderList.push(tempObj);
+                        }
+                    })
+                }
+            }
+
+            return { orderList, notInCci30 }
+        })
+
+        const numFruits = await Promise.all(checkExistence)
+        //console.log("PFFFF: ", numFruits[0])
+        return numFruits[0];
+
+    } catch (error) {
+        console.log("ERROR IN GET ORDER LIST FUNCRION: ", error);
+    }
+}
+
 exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30details, usdtpairs) => {
     // Variables
     let sortedArray;
@@ -490,7 +892,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                     let tempObj = {
                                         asset: w.asset,
                                         order_type: order_type,
-                                        order_percentage: (Math.floor(weightDifference * 10) / 10),
+                                        order_percentage: (Math.floor(weightDifference * 10) / 10) - 0.1,
                                         order_price: u.order_price,
                                     }
 
@@ -528,7 +930,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                     let tempObj = {
                                         asset: c.asset,
                                         order_type: "BUY",
-                                        order_percentage: (Math.floor(c.weight * 10) / 10),
+                                        order_percentage: (Math.floor(c.weight * 10) / 10) - 0.1,
                                         order_price: u.order_price
                                     }
 
@@ -565,7 +967,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                         let tempObj = {
                                             asset: c.asset,
                                             order_type: order_type,
-                                            order_percentage: (Math.floor(weightDifference * 10) / 10),
+                                            order_percentage: (Math.floor(weightDifference * 10) / 10) - 0.1,
                                             order_price: u.order_price,
                                         }
 
@@ -881,18 +1283,7 @@ exports.getOpenOrdersList = async () => {
 
 // Convert remaining asset to BNB
 exports.convertToBnb = async () => {
-    console.log("IN CONVERTTOBNB FUNCTION");
-
-    try {
-        // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
-
-        client.dustTransfer(['USDT'])
-            .then(response => client.logger.log("CONVERT TO BNB DUST DONE: ", response.data))
-            .catch(error => client.logger.error("bnb dust: ", error.response.data.msg))
-    } catch (error) {
-        console.log("ERROR IN CONVERT TO BNB DUST: ", error)
-    }
+    
 }
 
 // Deposit history

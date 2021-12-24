@@ -9,6 +9,7 @@ const {
     placeBuyLimitOrders,
     getOpenOrdersList,
     placeBuyMarketOrders,
+    convertToBnb
 } = require('./binance');
 const { getCCi30Info } = require('./constituents');
 
@@ -230,14 +231,14 @@ exports.getBTCrebalancing = async (req, res, next) => {
                                         // 5. Get wallet BTC value of each coins
                                         await getBinanceWalletBTCValues(clientwallet, usdtpairs[0])
                                             .then(async (walletBTCweight) => {
-                                                //console.log("PERCENTAGE: ", walletBTCweight.clientWallet)
+                                                console.log("PERCENTAGE: ", walletBTCweight.clientWallet)
                                                 //console.log("TOTAL BTC: ", walletBTCweight.totalBTC)
                                                 //console.log("TOTAL BTC: ", walletBTCweight.totalUSDT)
 
                                                 // 6. Get order list
                                                 await getOrderListWithoutQty(walletBTCweight.clientWallet, walletBTCweight.totalUSDT, cci30details, usdtpairs[0])
                                                     .then(async (orders) => {
-                                                        console.log("ORDER LIST: ", orders.orderList);
+                                                        //console.log("ORDER LIST: ", orders.orderList);
                                                         //console.log("NOT IN CCI30: ", orders.notInCci30);
 
                                                         // Variables
@@ -303,6 +304,14 @@ exports.getBTCrebalancing = async (req, res, next) => {
                                                                         canceledOrdersArray = canceledOrders;
                                                                     })
                                                             }, 2 * 60 * 1000);
+
+                                                            // Convert dust to BNB
+                                                            setTimeout(async () => {
+                                                                await convertToBnb()
+                                                                    .then(() => {
+                                                                        console.log("CONVERT DUST TO BNB DONE: ")
+                                                                    })
+                                                            }, 3 * 60 * 1000);
 
                                                             // Place all buy market orders for orders that have been canceled
                                                             /*setTimeout(async () => {
