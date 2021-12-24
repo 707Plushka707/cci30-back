@@ -922,6 +922,7 @@ exports.convertToBnbArray = async (convertArray, assets) => {
     }
 }
 
+// Convert all coins that are not in cci30 into BNB
 exports.convertToBnb = async (arr) => {
     console.log("ARR: ", arr);
 
@@ -937,6 +938,31 @@ exports.convertToBnb = async (arr) => {
         console.log("ERROR IN CONVERT TO BNB FUNCTION: ", error)
     }
 
+}
+
+// Get all orders hostory
+exports.getAllHistoryOfTheDay = async (assetArray) => {
+    try {
+        // Variables
+        let orderHistory = [];
+
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+
+        await assetArray.map(async (a) => {
+            await client.allOrders(`${a.asset}USDT`, {
+            }).then(response => {
+                orderHistory.push(response.data);
+                client.logger.log("HISTORY: ", response.data);
+            })
+                .catch(error => client.logger.error(error))
+        })
+
+        return orderHistory;
+
+    } catch (error) {
+        console.log("ERROR in hostiry of the day: ", error)
+    }
 }
 
 // Deposit history
