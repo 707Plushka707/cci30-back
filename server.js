@@ -11,6 +11,7 @@ const app = express();
 app.use(express.json());
 
 //Define Routes 
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/weight', require('./routes/weight'));
 app.use('/api/ohlcv', require('./routes/ohlcv'));
 app.use('/api/constituents', require('./routes/constituents'));

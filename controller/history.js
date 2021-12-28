@@ -1,6 +1,7 @@
 const {
     getBinanceAccountInfo,
-    getAllHistoryOfTheDay
+    getAllHistoryOfTheDay,
+    accountSnapshot
 } = require('./binance');
 const { getCCi30Info } = require('./constituents');
 
@@ -48,5 +49,15 @@ exports.getOrdersHistory = async () => {
             })
     } catch (error) {
         console.log("ERROR in order history file: ", error)
+    }
+}
+
+exports.getAccountSnaphot = async () => {
+    try {
+        let test = await accountSnapshot();
+        console.log("TEST: ", test);
+
+    } catch (error) {
+        console.log("ERROR in history.js snapshot: ", error)
     }
 }

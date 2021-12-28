@@ -24,8 +24,7 @@ const isInArray = (arrayToCkeck, assetToCheck) => {
 }
 
 // Get all USDT pairs from cci30 constituents
-exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
-    console.log("IN HERE: ");
+exports.getAllUSDTPairs = async (apiKey, secureKey, clientwallet, cci30Info) => {
     try {
         // Variables
         let usdtPairsAssets = [];
@@ -38,7 +37,7 @@ exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
         let combinedArray = [...clientwallet, ...cci30Info];
 
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        const client = new Spot(apiKey, secureKey);
 
         const cci30Mapping = await combinedArray.map(async (c) => {
             //console.log("ASSET: ", c.asset, " EXISTS ? ", isInArray(usdtPairsAssets, c.asset), " ARRAY: ", usdtPairsAssets);
@@ -102,8 +101,8 @@ exports.getAllUSDTPairs = async (clientwallet, cci30Info) => {
 }
 
 // Get all USDT order price
-exports.getUsdtOrderPrice = async (asset) => {
-    const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+exports.getUsdtOrderPrice = async (apiKey, secureKey, asset) => {
+    const client = new Spot(apiKey, secureKey);
 
     // Variables
     let order_price;
@@ -187,7 +186,7 @@ exports.getBinanceAccountInfo = async (apiKey, secretKey) => {
 
 // Get Binance wallet BTC value
 exports.getBinanceWalletBTCValues = async (clientwallet, usdtpairs) => {
-    console.log("BTC VALUE FUNCTION: ", clientwallet)
+    //console.log("BTC VALUE FUNCTION: ", clientwallet)
 
     // Variables
     let totalBTC = 0;
@@ -292,6 +291,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
         //console.log("SORTED ARRAY: ", sortedArray);
 
         if (walletUSDTtotal < 2010) {
+            console.log("LESS THAN 2K")
             await sortedArray.map(async (s) => {
                 //console.log("ASSET: ", s.asset, " WEIGHT: ", s.weight);
                 return totalPercentageLess2k = totalPercentageLess2k + s.weight;
@@ -716,22 +716,37 @@ exports.getOrderQty = async (orderlist, usdtpairs, totalbtc) => {
 }
 
 // Place SELL MARKET orders
-exports.placeSellMarketOrders = async (sellMarketOrders) => {
+exports.placeSellMarketOrders = async (apiKey, secureKey, sellMarketOrders) => {
     try {
-        // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        // Variables 
+        let successSellMarket = [];
+        let errorSellMarket = [];
 
-        await sellMarketOrders.map(async (sm) => {
+        // Connect to Binance account
+        const client = new Spot(apiKey, secureKey);
+
+        const sellOrder = await sellMarketOrders.map(async (sm) => {
             //console.log("SELL: ", sm)
             await client.newOrder(`${sm.asset}USDT`, 'SELL', 'MARKET', {
                 quantity: sm.qty,
-            }).then(response => client.logger.log("AFTER SELL MRAKET: ", response.data))
-                .catch(error =>
+            }).then(response => {
+                successSellMarket.push(response.data);
+                client.logger.log("AFTER SELL MRAKET: ", response.data)
+
+                return { successSellMarket, errorSellMarket };
+            })
+                .catch(error => {
+                    errorSellMarket.push(sm);
+
+                    return { successSellMarket, errorSellMarket };
                     client.logger.error("Error sell market catch: ", error)
-                )
+                })
         })
 
-        return;
+        const numFruits = await Promise.all(sellOrder)
+        //console.log("PFFFF: ", numFruits[0])
+        return numFruits;
+
     } catch (error) {
         console.log("ERROR IN SELL MARKET ORDER: ", error)
     }
@@ -765,12 +780,16 @@ exports.placeBuyMarketOrders = async (buyMarketOrders) => {
 }
 
 // Place all BUY LIMIT orders
-exports.placeBuyLimitOrders = async (buyLimitOrders) => {
+exports.placeBuyLimitOrders = async (apiKey, secureKey, buyLimitOrders) => {
     try {
-        // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        // Variables
+        let successBuyLimit = [];
+        let errorBuyLimt = [];
 
-        await buyLimitOrders.map(async (bl) => {
+        // Connect to Binance account
+        const client = new Spot(apiKey, secureKey);
+
+        let buyOrder = await buyLimitOrders.map(async (bl) => {
             // Variables
             let usdtFreeValue = 0;
             let qtyXprice = 0;
@@ -796,8 +815,14 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
                     price: `${bl.order_price}`,
                     quantity: bl.qty,
                     timeInForce: 'GTC',
-                }).then(response => client.logger.log("AFTER BUY LIMIT ORDER: ", response.data))
+                }).then(response => {
+                    successBuyLimit.push(response.data)
+                    client.logger.log("AFTER BUY LIMIT ORDER: ", response.data)
+
+                    return { successBuyLimit, errorBuyLimt }
+                })
                     .catch(error => {
+                        errorBuyLimt.push(bl);
                         client.logger.error("BROOO: ", error.response.data.msg)
                     })
             }
@@ -824,8 +849,14 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
                         price: `${bl.order_price}`,
                         quantity: Number(finalQty.toFixed(decimalCount)),
                         timeInForce: 'GTC',
-                    }).then(response => client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data))
+                    }).then(response => {
+                        successBuyLimit.push(response.data)
+                        client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data)
+
+                        return { successBuyLimit, errorBuyLimt }
+                    })
                         .catch(error => {
+                            errorBuyLimt.push(bl);
                             client.logger.error("GADDAM: ", error.response.data.msg)
                         })
                 } else {
@@ -833,15 +864,23 @@ exports.placeBuyLimitOrders = async (buyLimitOrders) => {
                         price: `${bl.order_price}`,
                         quantity: finalQty,
                         timeInForce: 'GTC',
-                    }).then(response => client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data))
+                    }).then(response => {
+                        successBuyLimit.push(response.data)
+                        client.logger.log("AFTER BUY LIMIT ORDER IN ELSE: ", response.data)
+
+                        return { successBuyLimit, errorBuyLimt }
+                    })
                         .catch(error => {
+                            errorBuyLimt.push(bl);
                             client.logger.error("pfff: ", error.response.data.msg)
                         })
                 }
             }
         })
 
-        return;
+        const numFruits = await Promise.all(buyOrder)
+        //console.log("PFFFF: ", numFruits[0])
+        return numFruits;
     } catch (error) {
         console.log("ERROR IN BUY LIMIT ORDER: ", error)
     }
@@ -923,12 +962,12 @@ exports.convertToBnbArray = async (convertArray, assets) => {
 }
 
 // Convert all coins that are not in cci30 into BNB
-exports.convertToBnb = async (arr) => {
+exports.convertToBnb = async (apiKey, secureKey, arr) => {
     console.log("ARR: ", arr);
 
     try {
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        const client = new Spot(apiKey, secureKey);
 
         await client.dustTransfer(arr)
             .then(response => client.logger.log("CONVERT TO BNB DUST DONE: ", response.data))
@@ -951,6 +990,7 @@ exports.getAllHistoryOfTheDay = async (assetArray) => {
 
         await assetArray.map(async (a) => {
             await client.allOrders(`${a.asset}USDT`, {
+                startTime: 1640563200000,
             }).then(response => {
                 orderHistory.push(response.data);
                 client.logger.log("HISTORY: ", response.data);
@@ -961,7 +1001,25 @@ exports.getAllHistoryOfTheDay = async (assetArray) => {
         return orderHistory;
 
     } catch (error) {
-        console.log("ERROR in hostiry of the day: ", error)
+        console.log("ERROR in history of the day: ", error)
+    }
+}
+
+// Get account snapshot
+exports.accountSnapshot = async () => {
+    try {
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+
+        await client.accountSnapshot('SPOT')
+            .then(response => {
+                client.logger.log("SNAPSHOT DATE: ", response.data.snapshotVos[0].updateTime)
+                client.logger.log("SNAPSHOT DETAILS: ", response.data.snapshotVos[0].data)
+            })
+            .catch(error => client.logger.error(error))
+
+    } catch (error) {
+        console.log("ERROR in snapshot: ", error)
     }
 }
 
