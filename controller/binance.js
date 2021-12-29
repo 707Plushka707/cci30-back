@@ -980,17 +980,20 @@ exports.convertToBnb = async (apiKey, secureKey, arr) => {
 }
 
 // Get all orders hostory
-exports.getAllHistoryOfTheDay = async (assetArray) => {
+exports.getAllHistoryOfTheDay = async (apiKey, secureKey, assetArray) => {
     try {
+        console.log("ARRAY: ", assetArray);
+
         // Variables
         let orderHistory = [];
 
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        const client = new Spot(apiKey, secureKey);
 
         await assetArray.map(async (a) => {
             await client.allOrders(`${a.asset}USDT`, {
                 startTime: 1640563200000,
+                endTime: 1640649599000
             }).then(response => {
                 orderHistory.push(response.data);
                 client.logger.log("HISTORY: ", response.data);
