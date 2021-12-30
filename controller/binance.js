@@ -482,7 +482,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
 
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
-                        if (weightDifference > 0.51) {
+                        if (weightDifference > 0.5) {
                             order_type = "BUY"
 
                             await usdtpairs.map(async (u) => {
@@ -497,7 +497,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                     orderList.push(tempObj);
                                 }
                             })
-                        } else if (weightDifference < -0.51) {
+                        } else if (weightDifference < -0.5) {
                             order_type = "SELL"
 
                             await usdtpairs.map(async (u) => {
@@ -556,7 +556,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
 
                         // If difference > 0 ==> we shall buy the the asset with weight differenceCB
                         // Else we shall sell the excess
-                        if (weightDifference > 0.51) {
+                        if (weightDifference > 0.5) {
                             order_type = "BUY"
 
                             await usdtpairs.map(async (u) => {
@@ -574,7 +574,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                                 }
 
                             })
-                        } else if (weightDifference < -0.51) {
+                        } else if (weightDifference < -0.5) {
                             order_type = "SELL"
 
                             await usdtpairs.map(async (u) => {
@@ -604,7 +604,7 @@ exports.getOrderListWithoutQty = async (walletBTCweight, walletUSDTtotal, cci30d
                         if (isInArray(orderList, w.asset) == false) {
                             await usdtpairs.map(async (u) => {
                                 //console.log("UPAIR: ", u.asset, " WPAIR: ", w.asset, " WWEIGHT: ", w.weight_percentage);
-                                if (w.asset == u.asset && w.weight_percentage > 0.51) {
+                                if (w.asset == u.asset && w.weight_percentage > 0.5) {
                                     console.log(w.asset, " MAKE SELL ORDER: ", w.weight_percentage);
 
                                     notInCci30.push(w.asset);
@@ -657,8 +657,8 @@ exports.getOrderQty = async (orderlist, usdtpairs, totalbtc) => {
             await usdtpairs.map(async (u) => {
                 if (o.asset == u.asset) {
 
-                    // Only execute order if order percentage is >0.51, otherwise fees will not be worth it
-                    if (Math.abs(o.order_percentage) > 0.51) {
+                    // Only execute order if order percentage is >0.5, otherwise fees will not be worth it
+                    if (Math.abs(o.order_percentage) > 0.5) {
 
                         // Get number of decimal for each qty based on step_size
                         let stepSizeDecimal = countDecimals(u.step_size);
@@ -754,10 +754,10 @@ exports.placeSellMarketOrders = async (apiKey, secureKey, sellMarketOrders) => {
 }
 
 // Place BUY MARKET orders
-exports.placeBuyMarketOrders = async (buyMarketOrders) => {
+/*exports.placeBuyMarketOrders = async (apiKey, secureKey, buyMarketOrders) => {
     try {
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        const client = new Spot(apiKey, secureKey);
 
         // Variables
         let buyMarketErrorArray = [];
@@ -777,7 +777,7 @@ exports.placeBuyMarketOrders = async (buyMarketOrders) => {
     } catch (error) {
         console.log("ERROR IN BUY MARKET ORDER: ", error)
     }
-}
+}*/
 
 // Place all BUY LIMIT orders
 exports.placeBuyLimitOrders = async (apiKey, secureKey, buyLimitOrders) => {
@@ -806,7 +806,7 @@ exports.placeBuyLimitOrders = async (apiKey, secureKey, buyLimitOrders) => {
 
             // Compare usdtFreeValue with qty*price of buy order
             qtyXprice = bl.order_price * bl.qty;
-            console.log("QTYxPRICE: ", qtyXprice, " FREE: ", usdtFreeValue);
+            console.log("QTYxPRICE: ", qtyXprice, " FREE: ", usdtFreeValue, " ASSET: ", bl.asset);
 
             // If free USDT is >= to what qty is required, proceed with tje buy limit
             if (usdtFreeValue > qtyXprice && usdtFreeValue > 10.1) {
@@ -829,7 +829,11 @@ exports.placeBuyLimitOrders = async (apiKey, secureKey, buyLimitOrders) => {
             // Else use remaining USDT for the order
             else {
                 let decimalCount = countDecimals(bl.qty)
-                let finalQty = Number((usdtFreeValue / bl.order_price).toFixed(decimalCount));
+                //let finalQty = Number((usdtFreeValue / bl.order_price).toFixed(decimalCount));
+                //console.log("FREE/OP: ", Number((usdtFreeValue / bl.order_price)));
+                //console.log("FREE/OP - TO FIXED: ", (Number(usdtFreeValue / bl.order_price)).toFixed(decimalCount + 2));
+                //console.log("FREE/OP * 10 - TO FIXED - DIVIDED: ", (Number(usdtFreeValue / bl.order_price)).toFixed(decimalCount + 2).substring(0, (Number(usdtFreeValue / bl.order_price)).toFixed(decimalCount + 2).length - 2));
+                let finalQty = Number((Number(usdtFreeValue / bl.order_price)).toFixed(decimalCount + 2).substring(0, (Number(usdtFreeValue / bl.order_price)).toFixed(decimalCount + 2).length - 2));
                 console.log("FINAL: ", finalQty);
 
                 // If qty is till the same as the previous, substract
@@ -887,13 +891,13 @@ exports.placeBuyLimitOrders = async (apiKey, secureKey, buyLimitOrders) => {
 }
 
 // Get open orders
-exports.getOpenOrdersList = async () => {
+exports.getOpenOrdersList = async (apiKey, secureKey) => {
     try {
         // Variables
         let canceledOrderArray = [];
 
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        const client = new Spot(apiKey, secureKey);
 
         // Get list of all open orders
         await client.openOrders()
@@ -903,7 +907,7 @@ exports.getOpenOrdersList = async () => {
                 await response.data.map(async (oo) => {
                     // Cancel all open orders
                     client.cancelOpenOrders(`${oo.symbol}`, {
-                        recvWindow: 3000
+                        recvWindow: 60000
                     }).then(async (res) => {
                         client.logger.log("CANCELED: ", res.data)
 
@@ -1009,10 +1013,11 @@ exports.getAllHistoryOfTheDay = async (apiKey, secureKey, assetArray) => {
 }
 
 // Get account snapshot
-exports.accountSnapshot = async () => {
+exports.accountSnapshot = async (apiKey, secureKey) => {
     try {
         // Connect to Binance account
-        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        //const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+        const client = new Spot(apiKey, secureKey);
 
         await client.accountSnapshot('SPOT')
             .then(response => {
@@ -1042,5 +1047,66 @@ exports.depositInfo = async () => {
 
     } catch (error) {
         console.log("ERROR IN DEPOSIT INFO: ", error)
+    }
+}
+
+// Get all orders history api
+exports.getAllHistoryOfTheDayApi = async (req, res, next) => {
+    try {
+        // Variables
+        let orderHistory = [];
+        const arrayAssetString = req.query.arrayAsset;
+        const arrayAsset = arrayAssetString.split(",");
+
+        // Connect to Binance account
+        const client = new Spot(req.query.apiKey, req.query.secureKey);
+
+        await arrayAsset.map(async (a) => {
+            await client.allOrders(`${a}USDT`, {
+                startTime: 1640822400000,
+            }).then(response => {
+                orderHistory.push(response.data);
+                client.logger.log("HISTORY: ", response.data);
+            })
+                .catch(error => client.logger.error(error))
+        })
+
+        res.status(200).json(orderHistory);
+
+    } catch (error) {
+        console.log("ERROR in history of the day: ", error)
+    }
+}
+
+// Get open orders api
+exports.getOpenOrdersListApi = async (req, res, next) => {
+    try {
+        // Variables
+        let canceledOrderArray = [];
+        let apiKey = req.query.apiKey;
+        let secureKey = req.query.secureKey;
+
+        // Connect to Binance account
+        const client = new Spot(apiKey, secureKey);
+
+        // Get list of all open orders
+        await client.openOrders()
+            .then(async (response) => {
+                await response.data.map(async (oo) => {
+                    // Cancel all open orders
+                    client.cancelOpenOrders(`${oo.symbol}`, {
+                        recvWindow: 60000
+                    }).then(async (res) => {
+                        canceledOrderArray.push(req.data);
+                        client.logger.log("CANCELED: ", res.data)
+                    })
+                        .catch(error => client.logger.error("Error get open order list catch: ", error))
+                })
+            })
+
+        res.status(200).json(canceledOrderArray);
+
+    } catch (error) {
+        console.log("ERROR IN GET OPEN ORDER LIST: ", error)
     }
 }

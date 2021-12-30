@@ -64,7 +64,7 @@ exports.rebalancing = async () => {
                 // 3.4. Get wallet BTC value of each coins
                 let binanceWalletBtcValue = await getBinanceWalletBTCValues(userWalletConstituents, allUsdtPairsWithOrderPrice);
                 //console.log(u.firstName, " WALLET: ");
-                //console.log("PERCENTAGE: ", binanceWalletBtcValue.clientWallet)
+                console.log("PERCENTAGE: ", binanceWalletBtcValue.clientWallet)
                 //console.log("TOTAL BTC: ", binanceWalletBtcValue.totalBTC)
                 //console.log("TOTAL USDT: ", binanceWalletBtcValue.totalUSDT)
 
@@ -107,15 +107,20 @@ exports.rebalancing = async () => {
                     // 3.9. Check for limit orders that have not been executed yet
                     // 3.10. Cancel them and go for market orders
                     setTimeout(async () => {
-                        canceledOrders = await getOpenOrdersList()
-                    }, (i + 1) * 60 * 1000);
+                        canceledOrders = await getOpenOrdersList(apiKey, secureKey);
 
-                    // 3.11. Convert dust to BNB
-                    setTimeout(async () => {
+                        // 3.11. Convert dust to BNB
                         let newUserWalletConstituents = await getBinanceAccountInfo(apiKey, secureKey);
                         let bnbConversionArray = await convertToBnbArray(cci30Constituents, newUserWalletConstituents);
                         let bnbConversionOrder = await convertToBnb(apiKey, secureKey, bnbConversionArray);
-                    }, i + (1.5) * 60 * 1000);
+                    }, (i + 1.5) * 60 * 1000);
+
+                    // 3.11. Convert dust to BNB
+                    /*setTimeout(async () => {
+                        let newUserWalletConstituents = await getBinanceAccountInfo(apiKey, secureKey);
+                        let bnbConversionArray = await convertToBnbArray(cci30Constituents, newUserWalletConstituents);
+                        let bnbConversionOrder = await convertToBnb(apiKey, secureKey, bnbConversionArray);
+                    }, i + (1.5) * 60 * 1000);*/
                 } else {
                     console.log("NO ORDER TO MAKE")
                 }
