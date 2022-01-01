@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { Spot } = require('@binance/connector');
 const { getCCi30Info } = require('./constituents')
+const moment = require('moment');
 
 const countDecimals = (value) => {
 
@@ -1013,18 +1014,38 @@ exports.getAllHistoryOfTheDay = async (apiKey, secureKey, assetArray) => {
 }
 
 // Get account snapshot
-exports.accountSnapshot = async (apiKey, secureKey) => {
+exports.accountSnapshot = async (apiKey, secureKey, start, end) => {
     try {
+        // Variables
+        let balances = [];
+        let finalBalanceObj;
+
         // Connect to Binance account
-        //const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
         const client = new Spot(apiKey, secureKey);
 
-        await client.accountSnapshot('SPOT')
-            .then(response => {
-                client.logger.log("SNAPSHOT DATE: ", response.data.snapshotVos[0].updateTime)
-                client.logger.log("SNAPSHOT DETAILS: ", response.data.snapshotVos[0].data)
+        await client.accountSnapshot('SPOT', {
+            startTime: start,
+            endTime: end
+        }).then(async (response) => {
+            //client.logger.log("SNAPSHOT DATE: ", response.data.snapshotVos[0].updateTime)
+            //client.logger.log("SNAPSHOT DETAILS: ", response.data.snapshotVos[0].data)
+
+            await response.data.snapshotVos[0].data.balances.map(async (d) => {
+                if (d.free > 0) {
+                    balances.push(d);
+                }
             })
+
+            finalBalanceObj = {
+                totalAssetOfBtc: response.data.snapshotVos[0].data.totalAssetOfBtc,
+                balances: balances
+            }
+
+            return finalBalanceObj;
+        })
             .catch(error => client.logger.error(error))
+
+        return finalBalanceObj;
 
     } catch (error) {
         console.log("ERROR in snapshot: ", error)
@@ -1047,6 +1068,50 @@ exports.depositInfo = async () => {
 
     } catch (error) {
         console.log("ERROR IN DEPOSIT INFO: ", error)
+    }
+}
+
+// Get BTCUSDT and BTCEUR
+exports.getYesterdayBTCPrice = async (req, res, next) => {
+    try {
+        // Variables
+        const currenciesString = req.query.currency;
+        const currencies = currenciesString.split(",");
+        let prices = [];
+
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+
+        // Get prices for BTCUSDT and BTCEUR
+        await currencies.map(async (c) => {
+            await client.aggTrades(`BTC${c}`, {
+                startTime: 1640908739000,
+                endTime: 1640908799000
+            })
+                .then(async (response) => {
+                    let d = moment(1640908739000).utcOffset('+0000').format("DD/MM/YYYY");
+
+                    let tempObj = {
+                        date: d,
+                        currency: c,
+                        priceBtc: Number(response.data[Object.keys(response.data)[0]].p)
+                    }
+
+                    prices.push(tempObj);
+
+                    console.log(prices);
+                    return prices;
+                })
+                .catch(error => client.logger.error(error.message))
+        })
+            .then(() => {
+                res.status(200).json(prices);
+            })
+
+
+
+    } catch (error) {
+        console.log("ERROR IN GET USDT AND EUR PRICE: ", error)
     }
 }
 
