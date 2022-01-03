@@ -25,7 +25,7 @@
   dependencies:
     "deepmerge" "^4.2.2"
 
-"@sendgrid/mail@^7.4.4":
+"@sendgrid/mail@^7.6.0":
   "integrity" "sha512-0KdaSZzflJD/vUAZjB3ALBIuaVGoLq22hrb2fvQXZHRepU/yhRNlEOqrr05MfKBnKskzq1blnD1J0fHxiwaolw=="
   "resolved" "https://registry.npmjs.org/@sendgrid/mail/-/mail-7.6.0.tgz"
   "version" "7.6.0"

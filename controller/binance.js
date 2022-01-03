@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const { Spot } = require('@binance/connector');
 const { getCCi30Info } = require('./constituents')
 const moment = require('moment');
+const sendEmail = require('../utils/sendEmail')
+const OrderHistory = require('../models/OrderHistory');
 
 const countDecimals = (value) => {
 
@@ -985,28 +987,96 @@ exports.convertToBnb = async (apiKey, secureKey, arr) => {
 }
 
 // Get all orders hostory
-exports.getAllHistoryOfTheDay = async (apiKey, secureKey, assetArray) => {
+exports.getAllHistoryOfTheDay = async (apiKey, secureKey, assetArray, user) => {
     try {
-        console.log("ARRAY: ", assetArray);
+        //console.log("ARRAY: ", assetArray);
 
         // Variables
-        let orderHistory = [];
+        let orderHistoryArray = [];
+        let start;
+        let end;
 
         // Connect to Binance account
         const client = new Spot(apiKey, secureKey);
 
-        await assetArray.map(async (a) => {
-            await client.allOrders(`${a.asset}USDT`, {
-                startTime: 1640563200000,
-                endTime: 1640649599000
+        end = moment(new Date()).utcOffset('+0000').format("x");
+        //start = moment(end).subtract(4, 'hours');
+        start = moment(end, "x").subtract(270, 'minutes').format("x");
+
+        let allHistory = await assetArray.map(async (a) => {
+            let assetHistory = await client.allOrders(`${a.asset}USDT`, {
+                startTime: start,
+                endTime: end
             }).then(response => {
-                orderHistory.push(response.data);
-                client.logger.log("HISTORY: ", response.data);
-            })
-                .catch(error => client.logger.error(error))
+                orderHistoryArray.push(response.data);
+                //client.logger.log("HISTORY: ", orderHistoryArray);
+
+                return orderHistoryArray;
+            }).catch(error => client.logger.error(error))
+
+            return assetHistory;
         })
 
-        return orderHistory;
+        Promise.all(allHistory).then(async (data) => {
+            //console.log("TEST: ", data[0]);
+            let mergedArrays = await [].concat.apply([], data[0])
+
+            //console.log("MERGED: ", mergedArrays);
+
+            // If mergedArrays length >0, send email to notify admin
+            if (mergedArrays.length > 0) {
+                let stringToSend = "";
+                let stringToSendFormatted = "";
+
+                // Save to DB
+                await OrderHistory.create({
+                    uid: user._id,
+                    date: moment(new Date()).format("DD/MM/YYYY HH:mm:ss"),
+                    orderHistory: mergedArrays,
+                    type: "Other"
+                })
+
+                await mergedArrays.map(async (m) => {
+                    let tempObj = {
+                        symbol: m.symbol,
+                        price: m.price,
+                        quantity: m.executedQty,
+                        orderID: m.ordreId,
+                        clientOrderID: m.clientOrderId,
+                        status: m.status,
+                        type: m.type,
+                        side: m.side,
+                        time: moment(m.time, "x").format("DD/MM/YYYY HH:mm:ss"),
+                        timezone: m.timeInForce,
+                    }
+
+                    let tempObjString = JSON.stringify(tempObj);
+                    tempObjString = tempObjString.slice(1, -1);
+
+                    if (stringToSend != "") {
+                        stringToSend = stringToSend.concat(", " + tempObjString + ",*****************************")
+                    } else {
+                        stringToSend = stringToSend.concat(tempObjString + ",*****************************")
+                    }
+
+                })
+
+                stringToSendFormatted = stringToSend.split(",").join("\n <br />");
+
+                try {
+                    await sendEmail({
+                        to: 'meganerasam@yahoo.fr',
+                        subject: `Suspicious order history detected for ${user.firstName} ${user.lastName}`,
+                        text: `Below is the order history of ${user.firstName} ${user.lastName} for ${moment(new Date).format("DD/MM/YYYY")} <br />
+                        ${stringToSendFormatted}`
+                    });
+
+                    console.log("Email sent")
+                } catch (error) {
+                    console.log("Email could not be sent")
+                }
+            }
+        })
 
     } catch (error) {
         console.log("ERROR in history of the day: ", error)
