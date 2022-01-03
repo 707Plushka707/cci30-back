@@ -719,18 +719,18 @@ exports.getOrderQty = async (orderlist, usdtpairs, totalbtc) => {
 }
 
 // Place SELL MARKET orders
-exports.placeSellMarketOrders = async (apiKey, secureKey, sellMarketOrders) => {
+exports.placeSellMarketOrders = async (sellMarketOrders, user) => {
     try {
         // Variables 
         let successSellMarket = [];
         let errorSellMarket = [];
 
         // Connect to Binance account
-        const client = new Spot(apiKey, secureKey);
+        const client = new Spot(user.apiKey, user.secureKey);
 
         const sellOrder = await sellMarketOrders.map(async (sm) => {
             //console.log("SELL: ", sm)
-            await client.newOrder(`${sm.asset}USDT`, 'SELL', 'MARKET', {
+            let test = await client.newOrder(`${sm.asset}USDT`, 'SELL', 'MARKET', {
                 quantity: sm.qty,
             }).then(response => {
                 successSellMarket.push(response.data);
@@ -742,7 +742,6 @@ exports.placeSellMarketOrders = async (apiKey, secureKey, sellMarketOrders) => {
                     errorSellMarket.push(sm);
 
                     return { successSellMarket, errorSellMarket };
-                    client.logger.error("Error sell market catch: ", error)
                 })
         })
 
@@ -987,21 +986,21 @@ exports.convertToBnb = async (apiKey, secureKey, arr) => {
 }
 
 // Get all orders hostory
-exports.getAllHistoryOfTheDay = async (apiKey, secureKey, assetArray, user) => {
+exports.getAllHistoryOfTheDay = async (assetArray, user, start, end, functionCaller) => {
     try {
         //console.log("ARRAY: ", assetArray);
 
         // Variables
         let orderHistoryArray = [];
-        let start;
-        let end;
+        //let start;
+        //let end;
 
         // Connect to Binance account
-        const client = new Spot(apiKey, secureKey);
+        const client = new Spot(user.apiKey, user.secureKey);
 
-        end = moment(new Date()).utcOffset('+0000').format("x");
+        //end = moment(new Date()).utcOffset('+0000').format("x");
         //start = moment(end).subtract(4, 'hours');
-        start = moment(end, "x").subtract(270, 'minutes').format("x");
+        //start = moment(end, "x").subtract(270, 'minutes').format("x");
 
         let allHistory = await assetArray.map(async (a) => {
             let assetHistory = await client.allOrders(`${a.asset}USDT`, {
@@ -1025,55 +1024,60 @@ exports.getAllHistoryOfTheDay = async (apiKey, secureKey, assetArray, user) => {
 
             // If mergedArrays length >0, send email to notify admin
             if (mergedArrays.length > 0) {
-                let stringToSend = "";
-                let stringToSendFormatted = "";
 
                 // Save to DB
                 await OrderHistory.create({
                     uid: user._id,
                     date: moment(new Date()).format("DD/MM/YYYY HH:mm:ss"),
                     orderHistory: mergedArrays,
-                    type: "Other"
+                    type: functionCaller
                 })
 
-                await mergedArrays.map(async (m) => {
-                    let tempObj = {
-                        symbol: m.symbol,
-                        price: m.price,
-                        quantity: m.executedQty,
-                        orderID: m.ordreId,
-                        clientOrderID: m.clientOrderId,
-                        status: m.status,
-                        type: m.type,
-                        side: m.side,
-                        time: moment(m.time, "x").format("DD/MM/YYYY HH:mm:ss"),
-                        timezone: m.timeInForce,
-                    }
+                // If it is a suspicious order
+                if (functionCaller == "Other") {
 
-                    let tempObjString = JSON.stringify(tempObj);
-                    tempObjString = tempObjString.slice(1, -1);
+                    let stringToSend = "";
+                    let stringToSendFormatted = "";
 
-                    if (stringToSend != "") {
-                        stringToSend = stringToSend.concat(", " + tempObjString + ",*****************************")
-                    } else {
-                        stringToSend = stringToSend.concat(tempObjString + ",*****************************")
-                    }
+                    await mergedArrays.map(async (m) => {
+                        let tempObj = {
+                            symbol: m.symbol,
+                            price: m.price,
+                            quantity: m.executedQty,
+                            orderID: m.ordreId,
+                            clientOrderID: m.clientOrderId,
+                            status: m.status,
+                            type: m.type,
+                            side: m.side,
+                            time: moment(m.time, "x").format("DD/MM/YYYY HH:mm:ss"),
+                            timezone: m.timeInForce,
+                        }
 
-                })
+                        let tempObjString = JSON.stringify(tempObj);
+                        tempObjString = tempObjString.slice(1, -1);
 
-                stringToSendFormatted = stringToSend.split(",").join("\n <br />");
+                        if (stringToSend != "") {
+                            stringToSend = stringToSend.concat(", " + tempObjString + ",*****************************")
+                        } else {
+                            stringToSend = stringToSend.concat(tempObjString + ",*****************************")
+                        }
 
-                try {
-                    await sendEmail({
-                        to: 'meganerasam@yahoo.fr',
-                        subject: `Suspicious order history detected for ${user.firstName} ${user.lastName}`,
-                        text: `Below is the order history of ${user.firstName} ${user.lastName} for ${moment(new Date).format("DD/MM/YYYY")} <br />
+                    })
+
+                    stringToSendFormatted = stringToSend.split(",").join("\n <br />");
+
+                    try {
+                        await sendEmail({
+                            to: 'meganerasam@yahoo.fr',
+                            subject: `Suspicious order history detected for ${user.firstName} ${user.lastName}`,
+                            text: `Below is the order history of ${user.firstName} ${user.lastName} for ${moment(new Date).format("DD/MM/YYYY")} <br />
                         ${stringToSendFormatted}`
-                    });
+                        });
 
-                    console.log("Email sent")
-                } catch (error) {
-                    console.log("Email could not be sent")
+                        console.log("Email sent")
+                    } catch (error) {
+                        console.log("Email could not be sent")
+                    }
                 }
             }
         })
@@ -1182,6 +1186,26 @@ exports.getYesterdayBTCPrice = async (req, res, next) => {
 
     } catch (error) {
         console.log("ERROR IN GET USDT AND EUR PRICE: ", error)
+    }
+}
+
+// Binance withdraw to other Binance Wallet using BNB network
+exports.makeWithdrawalBnbNetwork = async () => {
+    try {
+        // Variables
+
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY_TRANSFER, process.env.SECRET_KEY_TRANSFER);
+
+        await client.withdraw(
+            'BTC', // coin
+            'bnb136ns6lfw4zs5hg4n85vdthaad7hq5m4gtkgf23', // withdraw address
+            0.00021, // amount
+        ).then(response => client.logger.log("WITHDRAWAL: ", response.data))
+            .catch(error => client.logger.error(error))
+
+    } catch (error) {
+        console.log("ERROR IN MAKE WITHDRAWAL: ", error)
     }
 }
 

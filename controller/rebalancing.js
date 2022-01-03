@@ -9,10 +9,12 @@ const {
     placeBuyLimitOrders,
     getOpenOrdersList,
     convertToBnbArray,
-    convertToBnb
+    convertToBnb,
+    getAllHistoryOfTheDay
 } = require('./binance');
 const { getCCi30Info } = require('./constituents');
 const { getAllUsers } = require('./auth');
+const moment = require('moment');
 
 const isInArray = (arrayToCkeck, assetToCheck) => {
     let arr = arrayToCkeck;
@@ -94,8 +96,7 @@ exports.rebalancing = async () => {
 
                     // 3.7. If there are sell orders, execute them first to have USDT liquidity
                     if (sellOrders.length > 0) {
-                        exeSellMarketStatus = await placeSellMarketOrders(apiKey, secureKey, sellOrders)
-                        console.log("EXEC SELL MARKET: ", exeSellMarketStatus)
+                        exeSellMarketStatus = await placeSellMarketOrders(sellOrders, u)
                     }
 
                     // 3.8. Place all buy limit order after 3min so that we are sure that are executed all sell markets
@@ -115,12 +116,29 @@ exports.rebalancing = async () => {
                         let bnbConversionOrder = await convertToBnb(apiKey, secureKey, bnbConversionArray);
                     }, (i + 1.5) * 60 * 1000);
 
-                    // 3.11. Convert dust to BNB
-                    /*setTimeout(async () => {
-                        let newUserWalletConstituents = await getBinanceAccountInfo(apiKey, secureKey);
-                        let bnbConversionArray = await convertToBnbArray(cci30Constituents, newUserWalletConstituents);
-                        let bnbConversionOrder = await convertToBnb(apiKey, secureKey, bnbConversionArray);
-                    }, i + (1.5) * 60 * 1000);*/
+                    // 3.12. Get order history of rebalacing
+                    setTimeout(async () => {
+                        let combinedConsituents = [];
+
+                        // 3.12.1 Get Binance wallet info
+                        let walletConstituents = await getBinanceAccountInfo(apiKey, secureKey);
+
+                        // 3.12.2. Loop though all assets inside client wallet
+                        Promise.all(walletConstituents.map(async (t) => {
+                            if (t.asset != "USDT") {
+                                combinedConsituents.push(t);
+                            }
+
+                            return combinedConsituents;
+                        }))
+
+                        let end = moment(new Date()).utcOffset('+0000').format("x");
+                        let start = moment(end, "x").subtract(60, 'minutes').format("x");
+
+                        // 3.12.3. Get order history of merged assets
+                        await getAllHistoryOfTheDay(combinedConsituents, u, start, end, "Rebalancing");
+                    }, (i + 2) * 60 * 1000);
+
                 } else {
                     console.log("NO ORDER TO MAKE")
                 }

@@ -53,8 +53,11 @@ exports.getOrdersHistory = async () => {
                 return combinedConsituents;
             }))
 
+            let end = moment(new Date()).utcOffset('+0000').format("x");
+            let start = moment(end, "x").subtract(270, 'minutes').format("x");
+
             // 5. Get order history of merged assets
-            await getAllHistoryOfTheDay(apiKey, secureKey, combinedConsituents, u)
+            await getAllHistoryOfTheDay(combinedConsituents, u, start, end, "Other")
         })
     } catch (error) {
         console.log("ERROR in order history file: ", error)
