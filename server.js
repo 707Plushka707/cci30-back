@@ -18,6 +18,7 @@ app.use('/api/constituents', require('./routes/constituents'));
 app.use('/api/binance', require('./routes/binance'));
 app.use('/api/rebalancing', require('./routes/rebalancing'));
 app.use('/api/history', require('./routes/history'));
+app.use('/api/coinmarketcap', require('./routes/coinmarketcap'));
 
 app.get('/', (req, res) => res.json({ msg: 'Welcome to the Waitlist.....' }));
 

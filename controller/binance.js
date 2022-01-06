@@ -1200,7 +1200,11 @@ exports.makeWithdrawalBnbNetwork = async () => {
         await client.withdraw(
             'BTC', // coin
             'bnb136ns6lfw4zs5hg4n85vdthaad7hq5m4gtkgf23', // withdraw address
-            0.00021, // amount
+            0.00023, // amount
+            {
+                network: 'BNB',
+                addressTag: 374334424,
+            }
         ).then(response => client.logger.log("WITHDRAWAL: ", response.data))
             .catch(error => client.logger.error(error))
 
@@ -1267,5 +1271,22 @@ exports.getOpenOrdersListApi = async (req, res, next) => {
 
     } catch (error) {
         console.log("ERROR IN GET OPEN ORDER LIST: ", error)
+    }
+}
+
+exports.allCoinsInfo = async (req, res, next) => {
+    try {
+        // Connect to Binance account
+        const client = new Spot(process.env.API_KEY, process.env.SECRET_KEY);
+
+        await client.coinInfo()
+            .then(response => {
+                client.logger.log(response.data)
+                res.status(200).json(response.data);
+            })
+            .catch(error => client.logger.error(error))
+
+    } catch (error) {
+        console.log("ERROR IN ALL COIN INFO: ", error)
     }
 }

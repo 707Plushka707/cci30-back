@@ -1,5 +1,6 @@
 const express = require('express');
-const { getAllUSDTPairs, depositInfo, getOpenOrdersList, convertToBnb, getOpenOrdersListApi, getAllHistoryOfTheDayApi, getYesterdayBTCPrice, makeWithdrawalBnbNetwork } = require("../controller/binance");
+const { getAllUSDTPairs, depositInfo, getOpenOrdersList, convertToBnb, getOpenOrdersListApi, getAllHistoryOfTheDayApi, getYesterdayBTCPrice, makeWithdrawalBnbNetwork,
+    allCoinsInfo } = require("../controller/binance");
 
 const router = express.Router();
 
@@ -11,6 +12,7 @@ router.get("/converttobnb", convertToBnb);
 router.get("/dayhistoryapi", getAllHistoryOfTheDayApi);
 router.get("/btccurrencyprice", getYesterdayBTCPrice);
 router.get("/withdrawal", makeWithdrawalBnbNetwork);
+router.get("/coinInfo", allCoinsInfo);
 /*router.get("/accountInfo", getAccountInfo);
 router.get("/accountInfo2", binanceNPM);
 router.get("/accountInfo3", binanceConnector);*/
